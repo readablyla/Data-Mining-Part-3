@@ -32,7 +32,7 @@ import networkx as nx
 yacht_data = pd.read_csv("yacht_hydrodynamics.data", delim_whitespace=True)
 # Remove the response variable
 yacht_data = yacht_data.drop("7", axis = 1)
-# # Define node names by row and by column
+# # Define node names by row
 i_names = [str(i) for i in yacht_data.index.values]
 yacht_data.head()
 ```
@@ -202,112 +202,159 @@ These two sets of patterns uniquely identify samples corresponding to their resp
 Examining the data shows no 3-pattern solutions. 
 
 # Exercise 5
-- Use Iris dataset
-- Will draw heavily from assignment 1. I have copied in MST and kNN code below, as well as for aggregating results. 
-
+The Iris dataset from sklearn.datasets will be used for this task. The target cluster will be removed for the purpose of computing the MST.  
 ```{python}
-# class Edge:
-#     def __init__(self, s, w, e):
-#         self.start = s
-#         self.weight = w
-#         self.end = e
-#     def get_edge(self):
-#         return (str(self.start) + '-' + str(self.weight) + '-' + str(self.end))
-#     def get_nx_edge(self):
-#         return ((self.start, self.end, {'label': str(self.weight)}))
-# 
-# def minimum_spanning_tree_Prims(G):
-#     V = [i for i in range(len(G))] # nodes in the graph
-#     W = [] # nodes in the MST
-#     adj_weights = [0] + [float('inf')] * (len(G) - 1) # the [0] initalises the first node into the MST
-#     u = [-1] * len(G)
-#     def closestNode(weights, added_nodes): # find the nearest node in the 'adjacent weights' list
-#         m = float('inf') # minimum edge distance
-#         v = -1 # node to return
-#         for i in range(len(weights)):
-#             if ((i not in added_nodes) & (weights[i] < m)):
-#                 m = weights[i]
-#                 v = i
-#         return v
-# 
-#     while (set(W) != set(V)):
-#         v = closestNode(adj_weights, W)
-#         if (v != -1):
-#             W.append(v)
-#         for i in range(len(G)): # for each node:
-#             if ((i not in W) & (G[v][i] < adj_weights[i])):
-#                 u[i] = v
-#                 adj_weights[i] = G[v][i]
-#     return W, u
-# 
-# def get_mst(matrix, names, output_file):
-#     W, u = minimum_spanning_tree_Prims(matrix)
-#     node_labels = [names[n] for n in W]
-#     F = []
-#     for f in range(1, len(matrix)): # unordered 
-#         F.append(Edge(names[u[f]], matrix[f][u[f]], names[f]))
-#     G = nx.Graph()
-#     G.add_nodes_from(node_labels)
-#     G.add_edges_from([f.get_nx_edge() for f in F])
-#     nx.write_gml(G, output_file)
-#     return G
-# #one_c_result = get_mst(hd_matrix_r, i_names, 'graph_1c.gml')
-# 
-# def k_NNG(G, K):
-#     P = [i for i in range(len(G))]
-#     kNNG = []
-#     for p in P:
-#         dist = []
-#         for q in P:
-#             if (p != q):
-#                 dist.append([p, G[p][q], q])
-#         sorted_dist = sorted(dist, key = itemgetter(1))
-#         max_dist = sorted_dist[K-1][1]
-#         for d in sorted_dist:
-#             if d[1] <= max_dist:
-#                 kNNG.append(d)
-#     return kNNG
-# 
-# def get_k_NNG(k, matrix, names, output_file):
-#     E = k_NNG(matrix, k)
-#     V = [i for i in range(len(matrix))]
-#     kNNG = []
-#     node_labels = [names[n] for n in V]
-#     for e in range(len(E)):
-#         kNNG.append(Edge(node_labels[E[e][0]], matrix[E[e][0]][E[e][2]], node_labels[E[e][2]]))
-#     G = nx.Graph()
-#     G.add_nodes_from(node_labels)
-#     G.add_edges_from([e.get_nx_edge() for e in kNNG])
-#     nx.write_gml(G, output_file)
-#     return G
-# #five_result = get_k_NNG(2, hd_matrix_r, i_names, 'graph_5.gml')
-# 
-# MST_edges = list(one_c_result.edges)
-# kNNG_edges = list(five_result.edges)
-# common_edges = list(set(MST_edges).intersection(kNNG_edges))
-# 
-# # yEd output
-# G = nx.Graph()
-# G.add_nodes_from(i_names)
-# G.add_edges_from(common_edges)
-# nx.write_gml(G, 'graph_7.gml')
-# 
-# # tabulate the clusters
-# cluster = []
-# [cluster.append(sorted(list(nx.node_connected_component(G, n)))) for n in i_names]
-# u = [list(x) for x in set(tuple(x) for x in cluster)]
-# count = len(u)
-# clusters = list(zip(range(count), u)) 
-# clusters = pd.DataFrame(clusters, columns = ['cluster_label', 'elections']) 
+from operator import itemgetter
+from sklearn import datasets
+from sklearn.model_selection import train_test_split
+iris = datasets.load_iris()
+iris_data = pd.DataFrame(data= np.c_[iris['target'], iris['data']],
+                     columns= ['CLASS'] + iris['feature_names'])
+iris_features = iris_data.drop("CLASS", axis = 1) # remove the target from a copy of the data
+i_names = [str(i) for i in iris_features.index.values] # Define node names by row
+print(iris_features.head())
+```
+The remaining dataframe has 150 samples and four features.  
+
+The data will be normalised using a z-score transformation, and a distance matrix defined using the Euclidean distance measure.  
+```{python}
+# Normalise the data
+norm_iris_data = (iris_features - iris_features.mean())/iris_features.std()
+def euclid_distance(s1, s2):
+    return math.sqrt(np.sum((s1-s2) ** 2))
+# Distance matrix for samples:
+iris_samples_edist_m = [[euclid_distance(norm_iris_data.iloc[y],
+  norm_iris_data.iloc[x]) for y in range(len(i_names))] for x in range(len(i_names))]
+round(pd.DataFrame(iris_samples_edist_m, columns = i_names, index = i_names), 3)
 ```
 
 ## 5. a)
+```{python}
+class Edge:
+    def __init__(self, s, w, e):
+        self.start = s
+        self.weight = w
+        self.end = e
+    def get_edge(self):
+        return (str(self.start) + '-' + str(self.weight) + '-' + str(self.end))
+    def get_nx_edge(self):
+        return ((self.start, self.end, {'label': str(self.weight)}))
+
+def minimum_spanning_tree_Prims(G):
+    V = [i for i in range(len(G))] # nodes in the graph
+    W = [] # nodes in the MST
+    adj_weights = [0] + [float('inf')] * (len(G) - 1) # the [0] initalises the first node into the MST
+    u = [-1] * len(G)
+    def closestNode(weights, added_nodes): # find the nearest node in the 'adjacent weights' list
+        m = float('inf') # minimum edge distance
+        v = -1 # node to return
+        for i in range(len(weights)):
+            if ((i not in added_nodes) & (weights[i] < m)):
+                m = weights[i]
+                v = i
+        return v
+
+    while (set(W) != set(V)):
+        v = closestNode(adj_weights, W)
+        if (v != -1):
+            W.append(v)
+        for i in range(len(G)): # for each node:
+            if ((i not in W) & (G[v][i] < adj_weights[i])):
+                u[i] = v
+                adj_weights[i] = G[v][i]
+    return W, u
+
+def get_mst(matrix, names, output_file):
+    W, u = minimum_spanning_tree_Prims(matrix)
+    node_labels = [names[n] for n in W]
+    F = []
+    for f in range(1, len(matrix)): # unordered
+        F.append(Edge(names[u[f]], matrix[f][u[f]], names[f]))
+    G = nx.Graph()
+    G.add_nodes_from(node_labels)
+    G.add_edges_from([f.get_nx_edge() for f in F])
+    nx.write_gml(G, output_file)
+    return G
+five_a_result = get_mst(iris_samples_edist_m, i_names, 'graph_5a.gml')
+```
+The output file graph_5a.gml was processed using yEd Graph Editor to produce the following visualisation in `Figure XXXX`:
+```{r fig.cap = "Minimum Spanning Tree for Iris dataset samples", fig.width=7, fig.height=9}
+graph_5a <- readPNG("graph_5a.png")
+grid.raster(graph_5a)
+```
 
 ## 5. b)
+```{python}
+def k_NNG(G, K):
+    P = [i for i in range(len(G))]
+    kNNG = []
+    for p in P:
+        dist = []
+        for q in P:
+            if (p != q):
+                dist.append([p, G[p][q], q])
+        sorted_dist = sorted(dist, key = itemgetter(1))
+        max_dist = sorted_dist[K-1][1]
+        for d in sorted_dist:
+            if d[1] <= max_dist:
+                kNNG.append(d)
+    return kNNG
 
+def get_k_NNG(k, matrix, names, output_file):
+    E = k_NNG(matrix, k)
+    V = [i for i in range(len(matrix))]
+    kNNG = []
+    node_labels = [names[n] for n in V]
+    for e in range(len(E)):
+        kNNG.append(Edge(node_labels[E[e][0]], matrix[E[e][0]][E[e][2]], node_labels[E[e][2]]))
+    G = nx.Graph()
+    G.add_nodes_from(node_labels)
+    G.add_edges_from([e.get_nx_edge() for e in kNNG])
+    nx.write_gml(G, output_file)
+    return G
+five_b_result = get_k_NNG(3, iris_samples_edist_m, i_names, 'graph_5b.gml')
+```
+The output file graph_5b.gml was processed using yEd Graph Editor to produce the following visualisation in `Figure XXXX`:
+```{r fig.cap = "k-nearest-neighbours for Iris dataset samples", fig.width=7, fig.height=9}
+graph_5b <- readPNG("graph_5b.png")
+grid.raster(graph_5b)
+```
+
+\newpage
 ## 5. c)
+```{python}
+# Identify the common edges in the MST and k-NN graphs:
+MST_edges = list(five_a_result.edges)
+kNNG_edges = list(five_b_result.edges)
+common_edges = list(set(MST_edges).intersection(kNNG_edges))
+
+# Generate yEd output
+G = nx.Graph()
+G.add_nodes_from(i_names)
+G.add_edges_from(common_edges)
+nx.write_gml(G, 'graph_5c.gml')
+
+# Tabulate the clusters
+cluster = []
+for i in i_names:
+  cluster.append(sorted(list(nx.node_connected_component(G, i))))
+u = [list(x) for x in set(tuple(x) for x in cluster)]
+count = len(u)
+clusters = list(zip(range(count), u)) 
+clusters = pd.DataFrame(clusters, columns = ['cluster_label', 'samples'])
+```
 
 ## 5. d)
+The output file graph_5c.gml was processed using yEd Graph Editor to produce the following visualisation in `Figure XXXX`:  
+```{r fig.cap = "MST-kNN for Iris dataset samples", fig.width=7, fig.height=9}
+graph_5d <- readPNG("graph_5d.png")
+grid.raster(graph_5d)
+```
+
+The results were tabulated in part c, and the results printed below:  
+```{python}
+print(clusters)
+```
 
 # Exercise 6
 
