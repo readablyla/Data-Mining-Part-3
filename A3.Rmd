@@ -1,7 +1,7 @@
 ---
 title: "COMP3340_A3"
 author: "Leala Darby"
-date: "08/11/2020"
+date: "11/11/2020"
 output: 
   pdf_document:
     fig_caption: yes
@@ -20,7 +20,6 @@ library("grid")
 #library("RWeka")
 library("scatterplot3d")
 use_virtualenv("r-reticulate")
-#virtualenv_install("r-reticulate", packages=c("scikit-learn"))
 ```
 
 # Exercise 1
@@ -106,58 +105,200 @@ grid.raster(graph_1)
 ```
 
 \newpage  
-# Exercise 2
-- "The classification problem could be of binary type" - does that mean it must be? I would like to use the Iris dataset, which has >2 classes in the response.
-The classification dataset to be used is the iris dataset from sklearn.datasets. It has four continuous features, a response variable with three classes, and 150 samples in total.
+# Exercise 2  
+The classification dataset to be used is the Zoo Dataset made publicly available on [UCI Machine Learning Repository](https://archive.ics.uci.edu/ml/datasets/zoo). The file `zoo.data` was downloaded and saved in the working directory. It has 16 features, 15 of which are boolean and 1 ordinal, and a response variable with 7 classes. There are 101 samples in total.   
 ```{python}
-from sklearn import datasets
+dat = pd.read_csv("zoo.data", header=None)
+dat = dat.drop(columns=[0]) # remove the index column
+dat.head()
+```
+One-hot encoding the ordinal variable, column 13 (named 'legs'):
+```{python}
+one_hot = pd.get_dummies(dat[13], prefix='legs')
+dat = pd.concat([dat.iloc[:,0:12], one_hot, dat.iloc[:,13:17]], axis = 1)
+print(dat.head())
+```
+Of the 101 samples, 80% (81 rows) will be randomly denoted the training set and 20% (20 rows) will be set aside for testing. 
+```{python}
 from sklearn.model_selection import train_test_split
-iris = datasets.load_iris()
-iris_data = pd.DataFrame(data= np.c_[iris['target'], iris['data']],
-                     columns= ['CLASS'] + iris['feature_names'])
-print(iris_data.head())
+dat_train, dat_test = train_test_split(dat, test_size = 0.2)
+print("training data\n", dat_train)
+dat_train.to_csv('train_q2.csv', index = False)
+print("test data\n", dat_test)
+dat_test.to_csv("test_q2.csv", index = False)
 ```
-Of the 150 samples, 80% (120 rows) will be denoted the training set and 20% (30 rows) will be set aside for testing. 
+There are now 21 features. The relationship between each feature and the target class will be assessed using the Chi-Squared test of independence, as discussed at https://www.geeksforgeeks.org/ml-chi-square-test-for-feature-selection/. My implementation in R is as follows (with the predefined Chi-square statistic computed by R appended to the resulting data frame as a sanity check):
+```{r warning=FALSE}
+dat_train <- read.csv("train_q2.csv")
+dat_train <- dat_train[,-16] # This column is constant, so should be removed automatically
+library("data.table")
+feature <- character()
+chisq_stat <- numeric()
+p_val <- numeric()
+predef_chisq_stat <- numeric()
+for (i in seq(1, length(names(dat_train))-1)) # For each feature
+{
+  tbl = table(dat_train[,i], dat_train$X17) # Compute contingency table for feature-class pairs
+  exp_tbl <- copy(tbl)
+  tbl <- addmargins(tbl) # Calculate row-wise and column-wise marginal totals
+  for (row in seq(1,2)) # Compute expected frequency of each category
+  {
+    for (col in seq(1,7))
+    {
+      exp_tbl[row, col] <- (tbl[row, 8]*tbl[3, col])/tbl[3, 8]
+    }
+  }
+  for (row in seq(1,2)) # Compute components of the Chi-square statistic sum
+  {
+    for (col in seq(1,7))
+    {
+      exp_tbl[row, col] <- (tbl[row, col]-exp_tbl[row, col])^2/exp_tbl[row, col]
+    }
+  }
+  chisq_stat[i] <- sum(colSums(exp_tbl)) # Calculate the Chi-square statistic
+  df <- (dim(tbl)[1] - 1) * (dim(tbl)[2] - 1) # Compute the degrees of freedom
+  # Find the p-value based on the calculated Chi-square statistic and degrees of freedom 
+  # from Chi-squared distribution function using stats::pchisq.
+  p_val[i] <- pchisq(chisq_stat[i], df, lower.tail = FALSE)
+  feature[i] <- names(dat_train)[i]
+  predef_chisq_stat[i] <- chisq.test(tbl, correct = FALSE)$statistic
+}
+dat <- data.frame(feature, chisq_stat, p_val, predef_chisq_stat)
+dat[order(-chisq_stat),]
+```
+Since the p-value for four of the features is less than a significance level of 5%, they will be discarded automatically (`legs_8`, `X11`, `X7`, `X15`).  
+
+Ordering the value of the Chi-squared test-statistic gives a ranked ordering of a measure of independence of each feature from the target class. In the interest of reducing the feature set and with acknowledgement that testing potential feature sets in the learning algorithm of part b) may give improved results, the 'best' (top) 8 features from this data frame will be selected:  
+
+```{r}
+selected_features <- c("X17",
+                       as.character(dat[order(-chisq_stat),][seq(1,8),]$feature))
+dat_train <- dat_train[, selected_features]
+head(dat_train)
+write.csv(dat_train, "dat_train_post_feature_selection.csv", row.names = FALSE)
+```
+
+Having done this, the test data must be subsetted to contain only the same features:
+```{r}
+dat_test <- read.csv("test_q2.csv")
+dat_test <- dat_test[, selected_features]
+write.csv(dat_test, "dat_test_post_feature_selection.csv", row.names = FALSE)
+```
+
+
+Next, convert the training and test sets into the appropriate data type for computing the Hamming distance, a distance measure appropriate for binary data:  
 ```{python}
-iris_train, iris_test = train_test_split(iris_data, test_size = 0.2)
-print(iris_train.head())
+train_data = pd.read_csv("dat_train_post_feature_selection.csv")
+train_data2 = train_data.iloc[:, 1:9].apply(lambda col: np.array(col, dtype=bool), axis=0)
+train_data3 = pd.concat([pd.DataFrame(train_data.iloc[:,0]), train_data2], axis = 1)
+test_data = pd.read_csv("dat_test_post_feature_selection.csv")
+test_data2 = test_data.iloc[:, 1:9].apply(lambda col: np.array(col, dtype=bool), axis=0)
+test_data3 = pd.concat([pd.DataFrame(test_data.iloc[:,0]), test_data2], axis = 1)
+train_data3.head()
 ```
-Next perform entropy-based Fayyad-Irani discretisation (https://www.ijcai.org/Proceedings/93-2/Papers/022.pdf) using `RWeka::Discretize`, removing the ambiguous features that result. Following the discretisation step, no features are removed the dataset.
-```{r}
-# py$iris_train$CLASS <- as.factor(py$iris_train$CLASS)
-# train_data <- Discretize(CLASS ~ ., data = py$iris_train)
-# # Remove any features that are identical after discretisation
-# train_data <- train_data[!duplicated(lapply(train_data, summary)) & !duplicated(lapply(train_data, summary),
-#                                                                  fromLast = TRUE)]
-# head(train_data)
-```
+Classification using k-Nearest Neighbours will be used to classify the data according to the class of the samples 'closest' to the test observation according to the computed Hamming distance. ‘Ties’ for multiple nodes at the same kth-smallest distance are not broken; all eligible nodes are included with distance less than or equal to the kth nearest node.
+```{python}
+from operator import itemgetter
+from statistics import mode
 
-Aside: Save the cutpoints defined here for use on the test data.
-```{r}
-# cutpoints <- list()
-# feature <- character()
-# for (i in seq(1, length(names(train_data))-1)){ # for each feature
-#   feature[i] <- names(train_data)[i]
-#   t <- table(train_data[,feature[i]], train_data$CLASS)
-#   for (j in seq(1, length(levels(train_data[,names(train_data)[i]])))){ # for each bin of a feature
-#     print(names(which.max(t[j,]))) # the label to assign to the bin
-#     print(levels(train_data[,names(train_data)[i]])) # the values of the bin itself
-#   }
-# }
+def hamming_distance(s1, s2):
+  return np.sum(np.logical_xor(s1, s2))
 
+def get_knn(train, test_obs, K):
+  dist = []
+  classes = []
+  for p in range(len(train)):
+    dist.append([hamming_distance(test_obs[1:], train.iloc[p, 1:]), p, train.iloc[p, 0]])
+  sorted_dist = sorted(dist, key = itemgetter(0))
+  max_dist = sorted_dist[K-1][0]
+  for d in sorted_dist:
+    if d[0] <= max_dist:
+      classes.append(d[2])
+  return classes
 
-
-# feature <- character()
-# cutpoint <- numeric()
-# for (i in seq(1, length(names(train_data))-1)){
-#   feature[i] <- names(train_data)[i]
-#   
-#   cutpoint[i] <- as.numeric(regmatches(levels(train_data[, i])[2], gregexpr("-?\\d.\\d+", levels(train_data[, i])[2]))[[1]])
-# }
-# ( cutpoints <- data.frame(feature, cutpoint) )
+def predict_knn_class(train, test_obs, K):
+  classes = get_knn(train, test_obs, K)
+  while (classes.count(True) == classes.count(False)):
+    K = K + 1
+    classes = get_knn(train, test_obs, K)
+  return mode(classes)
 ```
 
-Genuinely don't know how to go on with this question. The chi-squared test might not even remove any features. and if I have three classes at the end, what sort of distance measure could I define? Might need to go and find a binary dataset after all.
+For the training set alone:
+```{python}
+k=8
+pred=[]
+train_data_performance = train_data.copy()
+for row in range(len(train_data_performance)):
+  train_data_subset = train_data_performance[~train_data_performance.index.isin([row+1])]
+  test_obs = train_data_performance.iloc[row]
+  pred.append(predict_knn_class(train_data_subset, test_obs, k))
+train_data_performance["prediction"] = pred
+train_data_performance
+```
+
+For the test set:  
+```{python}
+pred = []
+for row in range(len(test_data)):
+  test_obs = test_data.iloc[row]
+  pred.append(predict_knn_class(train_data, test_obs, k))
+test_data['prediction'] = pred
+test_data.head(2)
+```
+
+Since we have a multiclass problem, the confusion matrix must be produced for each individual class.  
+Evaluating the training set:  
+```{python}
+def print_measures(dat, classname, divby0):
+  print('Class: ', classname)
+  TP = list((dat['X17'] == dat['prediction']) & (dat['prediction'] == classname)).count(True)
+  TN = list((dat['X17'] == dat['prediction']) & (dat['prediction'] != classname)).count(True)
+  FP = list((dat['X17'] != dat['prediction']) & (dat['prediction'] == classname)).count(True)
+  FN = list((dat['X17'] != dat['prediction']) & (dat['prediction'] != classname)).count(True)
+
+  print('I.')
+  sensitivity = TP / (TP + FN)
+  print('Sensitivity: ', sensitivity)
+  specificity = TN / (TN + FP)
+  print('Specificity: ', specificity)
+
+  print('II.')
+  accuracy = (TP + TN) / (TP + TN + FP + FN)
+  print('Accuracy', accuracy)
+  
+  print('div', divby0)
+  if (not divby0):
+    print('III.')
+    precision = TP / (TP + FP)
+    F1_score = 2 / ((1 / precision) + (1 / sensitivity))
+    print('F1 Score', F1_score)
+
+    print('IV.')
+    MCC = ((TP * TN) - (FP * FN)) / math.sqrt((TP + FP) * (TP + FN) * (TN + FP) * (TN + FN))
+    print('Matthews Correlation Coefficient', MCC)
+
+  print('V.')
+  YJ = sensitivity + specificity - 1
+  print('Youden\'s J Statistic', YJ)
+print("Training Data Results:\n")
+classes = train_data_performance.iloc[:,0].unique()
+for i in classes:
+  print_measures(train_data_performance, i, True)
+```
+
+
+Evaluating the test set:
+```{python}
+print("Test Data Results")
+classes = test_data.iloc[:,0].unique()
+classes
+for i in classes:
+  print_measures(test_data, i, True)
+```
+
+In both of these cases, the small sample size and imbalanced class split is evident in the results. 
+
 
 # Exercise 3
 Formal mathematical definition of the k-Feature Set Problem:  
@@ -174,10 +315,11 @@ d3 <- data.frame(x1 = c(1,0,1,1,1,0,0,0),
 d3
 ```
 It can be determined that this table has a 3-Feature set $F = \{x1,x2,x3\}$ and no 2-Feature sets. Additionally, the points are not linearly separable, as is demonstrated by the following 3-dimensional scatterplot (points of the "fail" class are plotted in red, while those in the "pass" class are plotted in blue):
-```{r}
+```{r fig.cap="no-linear separability of toy example"}
 scatterplot3d(x = d3$x1, y=d3$x2, z=d3$x3, color = c("red", "blue")[d3$y], pch=19)
 ```
-It is clear from inspecting `Figure X` that no single plane could be drawn that separates these points by colour. Therefore, the 3-Feature set $F = \{x1,x2,x3\}$ is not linearly separable.   
+
+It is clear from inspecting `Figure 2` that no single plane could be drawn that separates these points by colour. Therefore, the 3-Feature set $F = \{x1,x2,x3\}$ is not linearly separable.   
 
 # Exercise 4  
 Formal mathematical definition of the l-Pattern Identification Problem:   
@@ -279,7 +421,7 @@ def get_mst(matrix, names, output_file):
     return G
 five_a_result = get_mst(iris_samples_edist_m, i_names, 'graph_5a.gml')
 ```
-The output file graph_5a.gml was processed using yEd Graph Editor to produce the following visualisation in `Figure XXXX`:
+The output file graph_5a.gml was processed using yEd Graph Editor to produce the following visualisation in `Figure 3`:
 ```{r fig.cap = "Minimum Spanning Tree for Iris dataset samples", fig.width=7, fig.height=9}
 graph_5a <- readPNG("graph_5a.png")
 grid.raster(graph_5a)
@@ -317,7 +459,7 @@ def get_k_NNG(k, matrix, names, output_file):
     return G
 five_b_result = get_k_NNG(3, iris_samples_edist_m, i_names, 'graph_5b.gml')
 ```
-The output file graph_5b.gml was processed using yEd Graph Editor to produce the following visualisation in `Figure XXXX`:
+The output file graph_5b.gml was processed using yEd Graph Editor to produce the following visualisation in `Figure 4`:
 ```{r fig.cap = "k-nearest-neighbours for Iris dataset samples", fig.width=7, fig.height=9}
 graph_5b <- readPNG("graph_5b.png")
 grid.raster(graph_5b)
@@ -348,7 +490,7 @@ clusters = pd.DataFrame(clusters, columns = ['cluster_label', 'samples'])
 ```
 
 ## 5. d)
-The output file graph_5c.gml was processed using yEd Graph Editor to produce the following visualisation in `Figure XXXX`:  
+The output file graph_5c.gml was processed using yEd Graph Editor to produce the following visualisation in `Figure 5`:  
 ```{r fig.cap = "MST-kNN for Iris dataset samples", fig.width=7, fig.height=9}
 graph_5d <- readPNG("graph_5d.png")
 grid.raster(graph_5d)
@@ -363,8 +505,10 @@ print(clusters)
 # Exercise 6
 
 ## 6. a)
+An inter-rater reliability method measures the level of agreement between multiple validators, or raters. The values of IRR range from 0 to 1, where 1 indicates perfect agreement. Examples include Kappa statistics such as Cohen's Kappa and Fleiss' Kappa, and correlation coefficients including Pearson's and Spearman's coefficients.  
 
 ## 6. b)
+Cohen's Kappa is appropriate. 
 
 ## 6. c)
 
@@ -445,14 +589,14 @@ US_Incumbent[US_Incumbent == 0] <- noquote("?")
 write.csv(US_Incumbent, "US-Incumbent.csv", row.names = FALSE)
 ```
 
-Each file was then opened in Weka and saved as a .arff file. These files were then opened in a text editor and modified as shown in Figure X below, using US-Challenger.arff as an example:
+Each file was then opened in Weka and saved as a .arff file. These files were then opened in a text editor and modified as shown in Figure 6 below, using US-Challenger.arff as an example:
 ```{r fig.cap = "Modification of US-Challenger.arff"}
 q9a_process <- readPNG("q9_process_3.png")
 grid.raster(q9a_process)
 ```
 
 \newpage
-Next, US-Incumbent.arff was opened in Weka and the Apriori algorithm run with `car=TRUE` after ensuring that Target was set to `Attribute as class`. The output is as follows in Figure X.
+Next, US-Incumbent.arff was opened in Weka and the Apriori algorithm run with `car=TRUE` after ensuring that Target was set to `Attribute as class`. The output is as follows in Figure 7.
 ```{r fig.cap = "Apriori Output for US-Incumbent.arff"}
 q9a_out1 <- readPNG("q9_incumbent_output.png")
 grid.raster(q9a_out1)
@@ -472,7 +616,7 @@ Association rule 3: $Q7 \Rightarrow Target$
 $Confidence(Q7 \Rightarrow Target) = \frac{Confidence(Q7 \Rightarrow Target)}{Support(Target)} = \frac{12}{12} = 1$  
 $Lift((Q7 \Rightarrow Target)) = \frac{1}{18} = 0.055\ (3.d.p)$  
 
-Finally, US-Challenger.arff was opened in Weka and the Apriori algorithm run with `car=TRUE`. The output is shown in Figure X.
+Finally, US-Challenger.arff was opened in Weka and the Apriori algorithm run with `car=TRUE`. The output is shown in Figure 8.
 ```{r fig.cap = "Apriori Output for US-Challenger.arff"}
 q9a_out2 <- readPNG("q9_challenger_output.png")
 grid.raster(q9a_out2)
@@ -540,7 +684,7 @@ $\{Q4\} \Rightarrow Target$
 $\{Q1\} \Rightarrow Target$  
 $\{Q1, Q4\} \Rightarrow Target$  
 
-This is supported by the output in Weka, shown in Figure X:
+This is supported by the output in Weka, shown in Figure 9:
 ```{r fig.cap = "Apriori Output for US-Challenger with minConf = 0.6.arff"}
 q9b_out1 <- readPNG("q9b_challenger_output.png")
 grid.raster(q9b_out1)
