@@ -17,8 +17,10 @@ First import the required libraries:
 library("reticulate")# for incorporating Python code
 library("png")
 library("grid")
-library("RWeka")
+#library("RWeka")
 library("scatterplot3d")
+use_virtualenv("r-reticulate")
+#virtualenv_install("r-reticulate", packages=c("scikit-learn"))
 ```
 
 # Exercise 1
@@ -39,7 +41,7 @@ yacht_data.head()
 
 The variables are continuous and of different scales. Before defining the Euclidean Distance between points, the values will be standardised using a z-score transformation.
 ```{python}
-# normalise the data
+# Normalise the data
 norm_yacht_data = (yacht_data - yacht_data.mean())/yacht_data.std()
 def euclid_distance(s1, s2):
     return math.sqrt(np.sum((s1-s2) ** 2))
@@ -103,7 +105,7 @@ graph_1 <- readPNG("graph_1.png")
 grid.raster(graph_1)
 ```
 
-
+\newpage  
 # Exercise 2
 - "The classification problem could be of binary type" - does that mean it must be? I would like to use the Iris dataset, which has >2 classes in the response.
 The classification dataset to be used is the iris dataset from sklearn.datasets. It has four continuous features, a response variable with three classes, and 150 samples in total.
@@ -122,26 +124,26 @@ print(iris_train.head())
 ```
 Next perform entropy-based Fayyad-Irani discretisation (https://www.ijcai.org/Proceedings/93-2/Papers/022.pdf) using `RWeka::Discretize`, removing the ambiguous features that result. Following the discretisation step, no features are removed the dataset.
 ```{r}
-py$iris_train$CLASS <- as.factor(py$iris_train$CLASS)
-train_data <- Discretize(CLASS ~ ., data = py$iris_train)
-# Remove any features that are identical after discretisation
-train_data <- train_data[!duplicated(lapply(train_data, summary)) & !duplicated(lapply(train_data, summary),
-                                                                 fromLast = TRUE)]
-head(train_data)
+# py$iris_train$CLASS <- as.factor(py$iris_train$CLASS)
+# train_data <- Discretize(CLASS ~ ., data = py$iris_train)
+# # Remove any features that are identical after discretisation
+# train_data <- train_data[!duplicated(lapply(train_data, summary)) & !duplicated(lapply(train_data, summary),
+#                                                                  fromLast = TRUE)]
+# head(train_data)
 ```
 
 Aside: Save the cutpoints defined here for use on the test data.
 ```{r}
-cutpoints <- list()
-feature <- character()
-for (i in seq(1, length(names(train_data))-1)){ # for each feature
-  feature[i] <- names(train_data)[i]
-  t <- table(train_data[,feature[i]], train_data$CLASS)
-  for (j in seq(1, length(levels(train_data[,names(train_data)[i]])))){ # for each bin of a feature
-    print(names(which.max(t[j,]))) # the label to assign to the bin
-    print(levels(train_data[,names(train_data)[i]])) # the values of the bin itself
-  }
-}
+# cutpoints <- list()
+# feature <- character()
+# for (i in seq(1, length(names(train_data))-1)){ # for each feature
+#   feature[i] <- names(train_data)[i]
+#   t <- table(train_data[,feature[i]], train_data$CLASS)
+#   for (j in seq(1, length(levels(train_data[,names(train_data)[i]])))){ # for each bin of a feature
+#     print(names(which.max(t[j,]))) # the label to assign to the bin
+#     print(levels(train_data[,names(train_data)[i]])) # the values of the bin itself
+#   }
+# }
 
 
 
@@ -283,6 +285,7 @@ graph_5a <- readPNG("graph_5a.png")
 grid.raster(graph_5a)
 ```
 
+\newpage
 ## 5. b)
 ```{python}
 def k_NNG(G, K):
@@ -351,6 +354,7 @@ graph_5d <- readPNG("graph_5d.png")
 grid.raster(graph_5d)
 ```
 
+\newpage
 The results were tabulated in part c, and the results printed below:  
 ```{python}
 print(clusters)
@@ -364,36 +368,273 @@ print(clusters)
 
 ## 6. c)
 
-# Exercise 7
+# Exercise 7  
+## 7. a)  
+In classification, lazy learning is a type of learning process which lacks an explicit generalisation phase; no function to discriminate between classes is defined before queries are received. Instead, most of the generalisation tends to occur at consultation time, ie. when the algorithm is first presented with test data to classify, comparisons to the training set are performed and a result is deduced. Their main advantage is having the flexibility to handle evolution of the problem domain, however lazy learners are typically slower at making predictions than the alternative: eager learners. These classifiers perform the majority of their computation in advance of seeing the data to evaluate; they construct a target function upon receiving training data.  
+An example of a lazy classifier is the k-nearest neighbour algorithm.  
 
-## 7. a)
+Class imbalance is the issue of having differing distributions of samples across each of the target class present in the data, where these group sizes vary slightly or severely ('balanced classes' means there are approximately the same number of samples for each group). It may arise as a natural result of the problem domain, or due to sampling error. The class imbalance problem often leads to bias in a variety of predictive performance measures, particularly accuracy. Many algorithms are not inherently designed to deal with such issues; they tend to favour improving performance on the majority class, and the predictive performance of the infrequent class suffers. This is particularly undesirable in cases such as anomaly detection, where the minority class is much more important to detect than the majority (eg. scanning millions of transactions for examples of credit card fraud). This issue must be assessed on a case-by-case basis; there is no one-size-fits-all solution, although specialised techniques to assist do exist (eg. oversampling the minority class, generating synthetic samples for the minority class, or simply using a different performance metric like precision, recall or F1-score). 
 
 ## 7. b)
+The sensitivity of a test refers to its true positive rate, ie. the proportion of correctly identified positive outcomes out of all those that are genuinely positive. An increase in sensitivity attempts to reduce the number of false negative outcomes (and therefore type II errors). In a medical context, sensitivity may be referred to as the detection rate, and refers to the proportion of people who test positive for a condition within a sample who have it, thereby minimising misclassification of people requiring treatment. Sensitivity as defined as $\frac{TP}{(TP+FN)}$.  
+
+In contrast, the specificity of a test measures its ability to correctly identify negative results amongst all those that are actually negative, reducing the risk of false positive outcomes (type I errors). A complementary example to that above would be the proportion of people who test negative for a condition within a sample of people who do not have said condition. Therefore, sensitivity and specifity form a trade-off; increasing one will usually naturally reduce the other. Specificity is equal to $\frac{TN}{(FP+TN)}$.  
+
+Accuracy is a measure of a test's ability to correctly classify both positive and negative results amongst all outcomes. It is calculated as $\frac{(TP+TN)}{(TP+FP+TN+FN)}$.  
+
+Matthew's Correlation Coefficient is another measure of quality, which is regarded as a typically 'balanced' measure when assessing confusion matrices of results. Its formula is $\frac{TP *TN-FP*FN}{\sqrt{(TP+FP)(TP+FN)(TN+FP)(TN+FN)}}$, and its range of results is [-1,1] with similar implications to correlation coefficients.  
+
+Examples of these measures being computed are given below. The context of such an example may be that three new tests for an illness are being assessed on a group of 300 people where 150 people are genuinely ill, and 150 are not. These conditions of well-balanced classes are less likely to occur in real-life scenarios.    
+```{r}
+has_illness = c(rep(TRUE, 150), rep(FALSE, 150))
+# Test 1
+( m1 <- table(prediction = c(rep(TRUE, 120), rep(FALSE, 70), rep(TRUE, 110)), has_illness) )
+```
+From this table we see there are 40 true negative values, 30 false negative value, 110 false positive values and 120 true positive values. The results are:  
+$Sensitivity = \frac{120}{(120+30)}=80\%$  
+$Specificity = \frac{40}{(30+40)}=57.14\%$  
+$Accuracy = \frac{(120+40)}{(120+110+40+30)}=53.33\%\ (2.d.p)$  
+$MCC = \frac{120*40-110*30}{\sqrt{(120+40)(120+30)(40+110)(40+30)}}=9.45\%\ (2.d.p)$    
+
+Note that the sensitivity is quite high; higher than the specificity, yet the accuracy is worse than both and the MCC is very low. Inferences from these scores should only be made if the true population intended for this test to be performed on has a similar class split to that in this sample, due to the differences inherently introduced by imbalance. 
+
+```{r}
+# Test 2
+( m2 <- table(prediction = c(rep(TRUE, 50), rep(FALSE, 230), rep(TRUE, 20)), has_illness) )
+```
+From this table we see there are 130 true negative values, 100 false negative value, 20 false positive values and 50 true positive values. The results are:  
+$Sensitivity = \frac{50}{(50+100)}=33.33\%\ (2.d.p)$  
+$Specificity = \frac{130}{(20+130)}=86.67\%\ (2.d.p)$  
+$Accuracy = \frac{(50+130)}{(50+20+130+100)}=60\%$  
+$MCC = \frac{50*130-20*100}{\sqrt{(50+20)(50+100)(130+20)(130+100)}}=23.64\%\ (2.d.p)$   
+
+Note that this test has higher specificity than sensitivity, but the accuracy is still quite low. The MCC has increased somewhat compared to test 1.
+
+```{r}
+# Test 3
+( m3 <- table(prediction = c(rep(TRUE, 140), rep(FALSE, 130), rep(TRUE, 30)), has_illness) )
+```
+From this table we see there are 120 true negative values, 10 false negative value, 30 false positive values and 140 true positive values. The results are:  
+$Sensitivity = \frac{140}{(140+10)}=93.33\%\ (2.d.p)$  
+$Specificity = \frac{1200}{(30+120)}=80\%$  
+$Accuracy = \frac{(140+120)}{(140+30+10+120)}=86.67\%\ (2.d.p)$  
+$MCC = \frac{140*120-30*10}{\sqrt{(140+120)(140+10)(120+30)(120+10)}}=59.83\%\ (2.d.p)$   
+
+This test has relatively high sensitivity and specificity, and its accuracy and MCC are also quite high.  
 
 # Exercise 8
 - How is this different from Exercise 6? Should we incorporate those 2 things and a last one?
 
-# Exercise 9
+# Exercise 9  
+## 9. a)  
+```{r}
+pres_data <- read.csv("USPresidency.csv", stringsAsFactors = TRUE)
 
-## 9. a)
+# Where Target == 0:
+US_Challenger <- pres_data[pres_data$Target == 0,]
+US_Challenger <- US_Challenger[, c("Q1", "Q2", "Q3", "Q4", "Q5", "Q6", "Q7", "Q8", "Q9", 
+                                   "Q10", "Q11", "Q12", "Target")]
+US_Challenger[US_Challenger == 0] <- noquote("?")
+write.csv(US_Challenger, "US-Challenger.csv", row.names = FALSE)
+
+# Where Target == 1:
+US_Incumbent <- pres_data[pres_data$Target == 1,]
+US_Incumbent <- US_Incumbent[, c("Q1", "Q2", "Q3", "Q4", "Q5", "Q6", "Q7", "Q8", "Q9", 
+                                 "Q10", "Q11", "Q12", "Target")]
+US_Incumbent[US_Incumbent == 0] <- noquote("?")
+write.csv(US_Incumbent, "US-Incumbent.csv", row.names = FALSE)
+```
+
+Each file was then opened in Weka and saved as a .arff file. These files were then opened in a text editor and modified as shown in Figure X below, using US-Challenger.arff as an example:
+```{r fig.cap = "Modification of US-Challenger.arff"}
+q9a_process <- readPNG("q9_process_3.png")
+grid.raster(q9a_process)
+```
+
+\newpage
+Next, US-Incumbent.arff was opened in Weka and the Apriori algorithm run with `car=TRUE` after ensuring that Target was set to `Attribute as class`. The output is as follows in Figure X.
+```{r fig.cap = "Apriori Output for US-Incumbent.arff"}
+q9a_out1 <- readPNG("q9_incumbent_output.png")
+grid.raster(q9a_out1)
+```
+
+As can be seen above, the largest frequent itemset found for this set was size 3: {Q2, Q5, Q7}.  
+
+Association rule 1: $Q5 \Rightarrow Target$     
+$Confidence(Q5 \Rightarrow Target) = \frac{14}{14} = 1$  
+$Lift((Q5 \Rightarrow Target)) =  \frac{Confidence(Q5 \Rightarrow Target)}{Support(Target)} = \frac{1}{18} = 0.055\ (3.d.p)$  
+
+Association rule 2: $Q2 \Rightarrow Target$   
+$Confidence(Q2 \Rightarrow Target) = \frac{Confidence(Q2 \Rightarrow Target)}{Support(Target)} = \frac{12}{12} = 1$  
+$Lift((Q2 \Rightarrow Target)) = \frac{1}{18} = 0.055\ (3.d.p)$  
+
+Association rule 3: $Q7 \Rightarrow Target$   
+$Confidence(Q7 \Rightarrow Target) = \frac{Confidence(Q7 \Rightarrow Target)}{Support(Target)} = \frac{12}{12} = 1$  
+$Lift((Q7 \Rightarrow Target)) = \frac{1}{18} = 0.055\ (3.d.p)$  
+
+Finally, US-Challenger.arff was opened in Weka and the Apriori algorithm run with `car=TRUE`. The output is shown in Figure X.
+```{r fig.cap = "Apriori Output for US-Challenger.arff"}
+q9a_out2 <- readPNG("q9_challenger_output.png")
+grid.raster(q9a_out2)
+```
+
+As can be seen above, the largest frequent itemset found for this set was size 2: {Q1, Q2}, {Q1, Q4}, {Q1, Q9}, {Q4, Q7}, {Q4, Q9}. Of these, {Q1, Q4} has the highest support.  
+
+Association rule 1: $Q1 \Rightarrow Target$     
+$Confidence(Q1 \Rightarrow Target) = \frac{10}{10} = 1$  
+$Lift((Q1 \Rightarrow Target)) =  \frac{Confidence(Q1 \Rightarrow Target)}{Support(Target)} = \frac{1}{13} = 0.077\ (3.d.p)$  
+
+Association rule 2: $Q4 \Rightarrow Target$   
+$Confidence(Q4 \Rightarrow Target) = \frac{Confidence(Q4 \Rightarrow Target)}{Support(Target)} = \frac{10}{10} = 1$  
+$Lift((Q4 \Rightarrow Target)) = \frac{1}{13} = 0.077\ (3.d.p)$   
+
+Association rule 3: $\{Q1, Q4\} \Rightarrow Target$   
+$Confidence(\{Q1, Q4\} \Rightarrow Target) = \frac{Confidence(\{Q1, Q4\} \Rightarrow Target)}{Support(Target)} = \frac{8}{8} = 1$  
+$Lift((\{Q1, Q4\} \Rightarrow Target)) = \frac{1}{13} = 0.077\ (3.d.p)$  
+
+## 9. b)
+We will start using the Challenger Victory data, US-Challenger.arff, which has 13 samples:  
+We first set the minimum support threshold to 60% by setting `lowerBoundMinSupport=0.6`, and run the Apriori algorithm. The algorithm will run from the `upperBoundMinSupport` of 1.0 down to the `lowerBoundMinSupport`, 0.6, in increments of `delta` which is 0.05 by default.  
+
+The minimum support starts at 100% (expressed as a proportion of the number of instances) or 13 (expressed as the number of instances), the upper bound. At `k=1`, there are no itemsets with support 13, and by the second Monotonicity rule we know that 'if an itemset is infrequent, then none of its supersets will be frequent' so it terminates and the minimum support threshold is adjusted. The support is decreased by 5% to 95%, or $12.35\approx12$ (rounded to nearest integer). Again at `k=1` there are no itemsets with support 12 so the support is decreased by 5% to 90%, or $11.7\approx12$ for the next cycle. Once more we find no itemsets with support 12 for `k=1` so the support is decreased by 5% to 85%, or $11.05\approx11$. At `k=1` there is a frequent itemset having support 11: {Q4}, however this generates only one rule and the parameter `numRules` is set to 10, meaning the algorithm will try to find up to 10 rules having confidence greater than 60%. Shorthand will be used to describe the steps from here:  
+
+---  
+
+Cycle 4:  
+minSupport = 80% or $10.4\approx10$  
+`k=1`: {Q4} has support 11, {Q1} has support 10   
+`k=2`: no itemsets.  
+
+---  
+
+Cycle 5:  
+minSupport = 75% or $9.75\approx10$  
+`k=1`: {Q4} has support 11, {Q1} has support 10  
+`k=2`: no itemsets. 
+
+---  
+
+Cycle 6:  
+minSupport = 70% or $9.1\approx9$   
+`k=1`: {Q4} has support 11, {Q1} has support 10  
+`k=2`: no itemsets.  
+
+---   
+
+Cycle 7:  
+minSupport = 65% or $8.45\approx8$   
+`k=1`: {Q4} has support 11, {Q1} has support 10  
+`k=2`: {Q1, Q4} has support 8  
+`k=3`: no itemsets.  
+
+---  
+
+Cycle 8:   
+minSupport = 60% or $7.8\approx8$   
+`k=1`: {Q4} has support 11, {Q1} has support 10  
+`k=2`: {Q1, Q4} has support 8  
+`k=3`: no itemsets.  
+
+At this point, we have found 3 association rules but reached the minimum support threshold of 60%, which is a stopping point for the algorithm so it halts. The rules are as follows:  
+$\{Q4\} \Rightarrow Target$  
+$\{Q1\} \Rightarrow Target$  
+$\{Q1, Q4\} \Rightarrow Target$  
+
+This is supported by the output in Weka, shown in Figure X:
+```{r fig.cap = "Apriori Output for US-Challenger with minConf = 0.6.arff"}
+q9b_out1 <- readPNG("q9b_challenger_output.png")
+grid.raster(q9b_out1)
+```
+
+Now considering the Incumbent Victory data, US-Incumbent.arff, which has 18 samples:   
+We again first set the minimum support threshold to 60% by setting `lowerBoundMinSupport=0.6`, and run the Apriori algorithm. The steps are as follows:  
+Start with minimum support 100% (expressed as a proportion of the number of instances) or 18 (the number of instances), the upper bound. At `k=1`, there are no frequent itemsets having support of 18, so the minimum support is decreased to 95% or $17.1\approx17$, where at `k=1`
+there are once more no itemsets with minimum support 17:  
+
+---  
+
+Cycle 2:  
+minSupport = 90% or $16.2\approx16$  
+`k=1`: no itemsets.  
+
+---  
+
+Cycle 3:  
+minSupport = 85% or $15.3\approx15$  
+`k=1`: no itemsets.  
+
+--- 
+
+Cycle 4:  
+minSupport = 80% or $14.4\approx14$  
+`k=1`: {Q5} has support 14  
+`k=2`: no itemsets.  
+
+---  
+
+Cycle 5:  
+minSupport = 75% or $13.5\approx14$  
+`k=1`: {Q5} has support 14  
+`k=2`: no itemsets.  
+
+---  
+
+Cycle 6:  
+minSupport = 70% or $12.6\approx13$  
+`k=1`: {Q5} has support 14    
+`k=2`: no itemsets.  
+
+---  
+
+Cycle 7:  
+minSupport = 65% or $11.7\approx12$  
+`k=1`: {Q5} has support 14, {Q2} has support 12, {Q7} has support 12  
+`k=2`: no itemsets.  
+
+---  
+
+Cycle 8:  
+minSupport = 60% or $10.8\approx11$  
+`k=1`: {Q5} has support 14, {Q2} has support 12, {Q7} has support 12, {Q8} has support 11.  
+`k=2`: no itemsets.  
+
+At this point, we have found 4 association rules but reached the minimum support threshold of 60%, which is a stopping point for the algorithm so it halts. The rules are as follows:  
+$\{Q5\} \Rightarrow Target$  
+$\{Q2\} \Rightarrow Target$  
+$\{Q7\} \Rightarrow Target$  
+$\{Q8\} \Rightarrow Target$  
+
+# Exercise 10   
+Yes, the problem is linearly separable. First defining the sign function $$f(w,b) = sign(b + \sum_{i=1}^n w_ix_i)$$ where 
+$$b + \sum_{i=1}^n w_ix_i \geq 1\  \forall x \in Class_1$$ and  
+$$b + \sum_{i=1}^n w_ix_i \leq -1\  \forall x \in Class_2$$    
+Using the subset of features `Q4`, `Q7` and `Q12` alone, after removing duplicate rows against the target variable, the following function is defined to separate the elections:  
+$f(Q4, Q7, Q12) = 1 + 2 * Q7 -2 * Q12 - 4 * Q4$  
+The data preparation and application of the function are demonstrated below: 
 ```{r}
 pres_data <- read.csv("USPresidency.csv")
-pres_data[pres_data$Target == 0,]
-pres_data[pres_data$Target == 1,]
-```
-## 9. b)
+lin_sep <- pres_data[,c("Year", "Q4", "Q7", "Q12", "Target")]
+lin_sep <- unique(lin_sep[,c("Q4", "Q7", "Q12", "Target")])
 
-# Exercise 10
+lin_sep$Output <- 1 + 2 * lin_sep$Q7 - 2 * lin_sep$Q12 - 4 * lin_sep$Q4
+print(lin_sep)
+```
+Comparing the `Target` and `Output` columns, we can see that the groups have been discriminated by their sign, where Challenger victories are output negative from the function and Incumbent victories are classified as positive, with one exception. The year 1880 corresponds to the third row of this table, in which both targets are achieved for the same combination of questions. The function provided classifies this single sample in the Challenger class.  
+Drawing comparison to the sign function, we have:  
+$1 + \begin{bmatrix} -4&-4&-4 \\ 2&2&2 \\ -2&-2&-2 \end{bmatrix} \cdot \begin{bmatrix} 0&0&0 \\ 0&1&0 \\ 0&1&1 \end{bmatrix} \geq 1\  \forall x \in Incumbent$  
+$1 + \begin{bmatrix} -4&-4&-4&-4&-4 \\ 2&2&2&2&2 \\ -2&-2&-2&-2&-2 \end{bmatrix} \cdot \begin{bmatrix} 1&1&0 \\ 1&0&0 \\ 0&0&1 \\ 1&0&1 \\ 1&1&1 \end{bmatrix} \leq -1\  \forall x \in Challenger$  
 
 # Exercise 11
 
-# Exercise 12
+# Exercise 12  
+## 12. a)  
+Cross-validation is a method of validating model performance. It involves repeatedly 'holding out' a test set as the model is trained on training data, allowing evaluation to be performed on previously unseen samples that were not used in estimating the model and aggregating results across all repetitions to give a final performance evaluation. While there are many variants of cross-validation, K-fold cross-validation is the most popular. It involves creating k (where k is a user-defined parameter) equally-sized subsets or 'folds' of the data, sampled without replacement. For each round of the method, one such fold is selected to be the test data, and the remaining folds form the training set. This process is repeated k times, choosing a new subset for testing each time; in this way, each observation is used for testing only once. The results of all rounds are then averaged to produce a measure of model validation. The value chosen for k corresponds with the bias-variance tradeoff, and should be examined case by case. 5-Fold CV and 10-Fold CV are both popular choices of k, empirically shown to work well with this tradeoff.  
 
-## 12. a)
+## 12. b)  
+Bootstrapping is resampling method of model validation, in which the training set is sampled with replacement, meaning that after an observation is selected it is placed back in the pool being drawn from when building a bootstrap sample. This process is repeated until the sample is the desired size. Any remaining observations become the test set, which the model estimated by the training set is evaluated on. This may be repeated for multiple training/test splits and the results aggregated. The size of the sample and how many times the process will be repeated are user-defined parameters. 
 
-## 12. b)
-
-## 12. c)
+## 12. c)  
+Imputation is the process of 'filling in' missing values in a dataset, using one of various replacement techniques. The means of doing so must be considered on a case-by-case basis: some algorithms can handle missing values, others cannot. Often, the easiest (and most common) way of handling incomplete data is simply deleting all affected samples, but this is not necessarily appropriate or encouraged, particularly when the sample size is already limited, as it is a potential source of bias. Some examples of techniques used to replace missing data include mean (or median) substitution, where the mean/median of all present values for the feature in question is computed and used to fill in the gaps. While relatively simple, this can clearly only be used on numerical data and is not particularly accurate (doesn't account for column-wise correlation). Other techniques include using the mode of the data, computing a regression model to predict the missing values, or 'hot-deck' (randomly choosing the value from a similar observation).
 
 
 
