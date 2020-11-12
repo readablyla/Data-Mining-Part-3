@@ -17,7 +17,6 @@ First import the required libraries:
 library("reticulate")# for incorporating Python code
 library("png")
 library("grid")
-#library("RWeka")
 library("scatterplot3d")
 use_virtualenv("r-reticulate")
 ```
@@ -30,7 +29,7 @@ import pandas as pd
 import numpy as np
 import math
 import networkx as nx
-yacht_data = pd.read_csv("yacht_hydrodynamics.data", delim_whitespace=True)
+yacht_data = pd.read_csv("data\yacht_hydrodynamics.data", delim_whitespace=True)
 # Remove the response variable
 yacht_data = yacht_data.drop("7", axis = 1)
 # # Define node names by row
@@ -95,12 +94,12 @@ def get_RNG(matrix, names, output_file):
     G.add_edges_from([e.get_nx_edge() for e in RNG])
     nx.write_gml(G, output_file)
 # Generate Relative Neighbourhood Graph for samples:
-get_RNG(samples_edist_m, i_names, 'graph_1.gml')
+get_RNG(samples_edist_m, i_names, 'graphs\graph_1.gml')
 ```
 
 The output file graph_1.gml was processed using yEd Graph Editor to produce the following visualisation in `Figure 1`:
 ```{r fig.cap = "Relative Neighbourhood Graph for samples", fig.width=7, fig.height=9}
-graph_1 <- readPNG("graph_1.png")
+graph_1 <- readPNG("images/graph_1.png")
 grid.raster(graph_1)
 ```
 
@@ -108,7 +107,7 @@ grid.raster(graph_1)
 # Exercise 2  
 The classification dataset to be used is the Zoo Dataset made publicly available on [UCI Machine Learning Repository](https://archive.ics.uci.edu/ml/datasets/zoo). The file `zoo.data` was downloaded and saved in the working directory. It has 16 features, 15 of which are boolean and 1 ordinal, and a response variable with 7 classes. There are 101 samples in total.   
 ```{python}
-dat = pd.read_csv("zoo.data", header=None)
+dat = pd.read_csv("data\zoo.data", header=None)
 dat = dat.drop(columns=[0]) # remove the index column
 dat.head()
 ```
@@ -123,13 +122,13 @@ Of the 101 samples, 80% (81 rows) will be randomly denoted the training set and 
 from sklearn.model_selection import train_test_split
 dat_train, dat_test = train_test_split(dat, test_size = 0.2)
 print("training data\n", dat_train)
-dat_train.to_csv('train_q2.csv', index = False)
+dat_train.to_csv('data/train_q2.csv', index = False)
 print("test data\n", dat_test)
-dat_test.to_csv("test_q2.csv", index = False)
+dat_test.to_csv('data/test_q2.csv', index = False)
 ```
 There are now 21 features. The relationship between each feature and the target class will be assessed using the Chi-Squared test of independence, as discussed at https://www.geeksforgeeks.org/ml-chi-square-test-for-feature-selection/. My implementation in R is as follows (with the predefined Chi-square statistic computed by R appended to the resulting data frame as a sanity check):
 ```{r warning=FALSE}
-dat_train <- read.csv("train_q2.csv")
+dat_train <- read.csv("data/train_q2.csv")
 dat_train <- dat_train[,-16] # This column is constant, so should be removed automatically
 library("data.table")
 feature <- character()
@@ -175,23 +174,23 @@ selected_features <- c("X17",
                        as.character(dat[order(-chisq_stat),][seq(1,8),]$feature))
 dat_train <- dat_train[, selected_features]
 head(dat_train)
-write.csv(dat_train, "dat_train_post_feature_selection.csv", row.names = FALSE)
+write.csv(dat_train, "data/dat_train_post_feature_selection.csv", row.names = FALSE)
 ```
 
 Having done this, the test data must be subsetted to contain only the same features:
 ```{r}
-dat_test <- read.csv("test_q2.csv")
+dat_test <- read.csv("data/test_q2.csv")
 dat_test <- dat_test[, selected_features]
-write.csv(dat_test, "dat_test_post_feature_selection.csv", row.names = FALSE)
+write.csv(dat_test, "data/dat_test_post_feature_selection.csv", row.names = FALSE)
 ```
 
 
 Next, convert the training and test sets into the appropriate data type for computing the Hamming distance, a distance measure appropriate for binary data:  
 ```{python}
-train_data = pd.read_csv("dat_train_post_feature_selection.csv")
+train_data = pd.read_csv("data\dat_train_post_feature_selection.csv")
 train_data2 = train_data.iloc[:, 1:9].apply(lambda col: np.array(col, dtype=bool), axis=0)
 train_data3 = pd.concat([pd.DataFrame(train_data.iloc[:,0]), train_data2], axis = 1)
-test_data = pd.read_csv("dat_test_post_feature_selection.csv")
+test_data = pd.read_csv("data\dat_test_post_feature_selection.csv")
 test_data2 = test_data.iloc[:, 1:9].apply(lambda col: np.array(col, dtype=bool), axis=0)
 test_data3 = pd.concat([pd.DataFrame(test_data.iloc[:,0]), test_data2], axis = 1)
 train_data3.head()
@@ -419,11 +418,11 @@ def get_mst(matrix, names, output_file):
     G.add_edges_from([f.get_nx_edge() for f in F])
     nx.write_gml(G, output_file)
     return G
-five_a_result = get_mst(iris_samples_edist_m, i_names, 'graph_5a.gml')
+five_a_result = get_mst(iris_samples_edist_m, i_names, 'graphs\graph_5a.gml')
 ```
 The output file graph_5a.gml was processed using yEd Graph Editor to produce the following visualisation in `Figure 3`:
 ```{r fig.cap = "Minimum Spanning Tree for Iris dataset samples", fig.width=7, fig.height=9}
-graph_5a <- readPNG("graph_5a.png")
+graph_5a <- readPNG("images/graph_5a.png")
 grid.raster(graph_5a)
 ```
 
@@ -457,11 +456,11 @@ def get_k_NNG(k, matrix, names, output_file):
     G.add_edges_from([e.get_nx_edge() for e in kNNG])
     nx.write_gml(G, output_file)
     return G
-five_b_result = get_k_NNG(3, iris_samples_edist_m, i_names, 'graph_5b.gml')
+five_b_result = get_k_NNG(3, iris_samples_edist_m, i_names, 'graphs\graph_5b.gml')
 ```
 The output file graph_5b.gml was processed using yEd Graph Editor to produce the following visualisation in `Figure 4`:
 ```{r fig.cap = "k-nearest-neighbours for Iris dataset samples", fig.width=7, fig.height=9}
-graph_5b <- readPNG("graph_5b.png")
+graph_5b <- readPNG("images/graph_5b.png")
 grid.raster(graph_5b)
 ```
 
@@ -477,7 +476,7 @@ common_edges = list(set(MST_edges).intersection(kNNG_edges))
 G = nx.Graph()
 G.add_nodes_from(i_names)
 G.add_edges_from(common_edges)
-nx.write_gml(G, 'graph_5c.gml')
+nx.write_gml(G, 'graphs\graph_5c.gml')
 
 # Tabulate the clusters
 cluster = []
@@ -492,7 +491,7 @@ clusters = pd.DataFrame(clusters, columns = ['cluster_label', 'samples'])
 ## 5. d)
 The output file graph_5c.gml was processed using yEd Graph Editor to produce the following visualisation in `Figure 5`:  
 ```{r fig.cap = "MST-kNN for Iris dataset samples", fig.width=7, fig.height=9}
-graph_5d <- readPNG("graph_5d.png")
+graph_5d <- readPNG("images/graph_5d.png")
 grid.raster(graph_5d)
 ```
 
@@ -572,33 +571,33 @@ This test has relatively high sensitivity and specificity, and its accuracy and 
 # Exercise 9  
 ## 9. a)  
 ```{r}
-pres_data <- read.csv("USPresidency.csv", stringsAsFactors = TRUE)
+pres_data <- read.csv("data/USPresidency.csv", stringsAsFactors = TRUE)
 
 # Where Target == 0:
 US_Challenger <- pres_data[pres_data$Target == 0,]
 US_Challenger <- US_Challenger[, c("Q1", "Q2", "Q3", "Q4", "Q5", "Q6", "Q7", "Q8", "Q9", 
                                    "Q10", "Q11", "Q12", "Target")]
 US_Challenger[US_Challenger == 0] <- noquote("?")
-write.csv(US_Challenger, "US-Challenger.csv", row.names = FALSE)
+write.csv(US_Challenger, "data/US-Challenger.csv", row.names = FALSE)
 
 # Where Target == 1:
 US_Incumbent <- pres_data[pres_data$Target == 1,]
 US_Incumbent <- US_Incumbent[, c("Q1", "Q2", "Q3", "Q4", "Q5", "Q6", "Q7", "Q8", "Q9", 
                                  "Q10", "Q11", "Q12", "Target")]
 US_Incumbent[US_Incumbent == 0] <- noquote("?")
-write.csv(US_Incumbent, "US-Incumbent.csv", row.names = FALSE)
+write.csv(US_Incumbent, "data/US-Incumbent.csv", row.names = FALSE)
 ```
 
 Each file was then opened in Weka and saved as a .arff file. These files were then opened in a text editor and modified as shown in Figure 6 below, using US-Challenger.arff as an example:
 ```{r fig.cap = "Modification of US-Challenger.arff"}
-q9a_process <- readPNG("q9_process_3.png")
+q9a_process <- readPNG("images/q9_process_3.png")
 grid.raster(q9a_process)
 ```
 
 \newpage
 Next, US-Incumbent.arff was opened in Weka and the Apriori algorithm run with `car=TRUE` after ensuring that Target was set to `Attribute as class`. The output is as follows in Figure 7.
 ```{r fig.cap = "Apriori Output for US-Incumbent.arff"}
-q9a_out1 <- readPNG("q9_incumbent_output.png")
+q9a_out1 <- readPNG("images/q9_incumbent_output.png")
 grid.raster(q9a_out1)
 ```
 
@@ -618,7 +617,7 @@ $Lift((Q7 \Rightarrow Target)) = \frac{1}{18} = 0.055\ (3.d.p)$
 
 Finally, US-Challenger.arff was opened in Weka and the Apriori algorithm run with `car=TRUE`. The output is shown in Figure 8.
 ```{r fig.cap = "Apriori Output for US-Challenger.arff"}
-q9a_out2 <- readPNG("q9_challenger_output.png")
+q9a_out2 <- readPNG("images/q9_challenger_output.png")
 grid.raster(q9a_out2)
 ```
 
@@ -686,7 +685,7 @@ $\{Q1, Q4\} \Rightarrow Target$
 
 This is supported by the output in Weka, shown in Figure 9:
 ```{r fig.cap = "Apriori Output for US-Challenger with minConf = 0.6.arff"}
-q9b_out1 <- readPNG("q9b_challenger_output.png")
+q9b_out1 <- readPNG("images/q9b_challenger_output.png")
 grid.raster(q9b_out1)
 ```
 
@@ -756,7 +755,7 @@ Using the subset of features `Q4`, `Q7` and `Q12` alone, after removing duplicat
 $f(Q4, Q7, Q12) = 1 + 2 * Q7 -2 * Q12 - 4 * Q4$  
 The data preparation and application of the function are demonstrated below: 
 ```{r}
-pres_data <- read.csv("USPresidency.csv")
+pres_data <- read.csv("data/USPresidency.csv")
 lin_sep <- pres_data[,c("Year", "Q4", "Q7", "Q12", "Target")]
 lin_sep <- unique(lin_sep[,c("Q4", "Q7", "Q12", "Target")])
 
